@@ -7,14 +7,14 @@ Az adatbázis SQLite-ként van konfigurálva, és a Twig sablonok szolgálják k
 ## Projekt indítása
 
 - Függőségek telepítése:
-    composer install
+    - composer install
   
 - Adatbázis létrehozása és migrációk futtatása:
-    php bin/console doctrine:database:create
-    php bin/console doctrine:migrations:migrate
+    - php bin/console doctrine:database:create
+    - php bin/console doctrine:migrations:migrate
 
 - Szerver indítása:
-    symfony server:start
+    - symfony server:start
 
 - A frontend az alkalmazás gyökér URL-jén érhető el:
-    http://127.0.0.1:8000/
+    - http://127.0.0.1:8000/
