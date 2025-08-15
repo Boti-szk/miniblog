@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="hu">
+
+<head>
+    <meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini-Blog</title>
+    <link rel="stylesheet" href="{{ asset('css/style.css') }}">
+</head>
+
+<body>
+<p id="top"></p>
+
+<div id="box">
+<h1>Mini-Blog</h1>
+    <a href="#top" id="back-to-top">↑</a>
+
+<h2>Új bejegyzés létrehozása</h2>
+
+<form id="post-form">
+    <input type="hidden" id="edit-id">
+    <label for="title">Cím</label>
+    <input type="text" id="title" placeholder="Első blog bejegyzésem">
+    <label for="author">Szerző</label>
+    <input type="text" id="author" placeholder="Tesztelő32">
+    <label for="content">Tartalom</label>
+    <textarea id="content" placeholder="Ide lehet valami hosszú szöveget írni..."></textarea>
+    <p>
+        <button type="submit" id="submit-btn">Létrehozás</button>
+        <button type="button" id="cancel-edit" style="display:none;">Mégse</button>
+    <span id="error"></span>
+    </p>
+</form>
+
+<h2>Bejegyzések</h2>
+
+<div id="search">
+    <label for="search-id">Bejegyzés ID:</label>
+    <input type="number" id="search-id" min="1">
+    <p>
+    <button id="search-btn">Keresés</button>
+    <button id="reset-btn">Összes bejegyzés</button>
+    <span id="error2"></span>
+
+    </p>
+</div>
+
+<div id="posts"></div>
+
+<!-- jQuery betöltése -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<script>
+    //hiba megjelenítés
+    function showError(msg) {
+        $('#error').text(msg).show();
+        setTimeout(()=>$('#error').fadeOut(),2000);
+    }
+
+    function showError2(msg) {
+        $('#error2').text(msg).show();
+        setTimeout(()=>$('#error2').fadeOut(),2000);
+    }
+
+    //dátumformázás
+    function formatDate(iso) {
+        const d = new Date(iso);
+        return d.toLocaleString();
+    }
+
+    //bejegyzések megjelenítése
+    function renderCard(p) {
+        return `
+        <div class="card" data-id="${p.id}">
+            <h3>${p.title}</h3>
+            <div class="meta">Szerző: ${p.author} • Létrehozva: ${formatDate(p.createdAt)} • Módosítva: ${formatDate(p.updatedAt)}</div>
+            <div class="content">${p.content.replace(/\n/g,'<br>')}</div>
+            <p>
+                <button class="edit">Szerkesztés</button>
+                <button class="delete">Törlés</button>
+            </p>
+        </div>`;
+    }
+
+    //Keresés
+    $('#search-btn').on('click', function(e) {
+        e.preventDefault();
+        const id = $('#search-id').val().trim();
+        if (id) {
+            loadPostById(id);
+        } else {
+            showError2('Adj meg egy ID-t!');
+        }
+    });
+
+    //újra listázás (összes)
+    $('#reset-btn').on('click', function(e) {
+        e.preventDefault();
+        loadPosts();
+        $('#search-id').val('');
+    });
+
+    //összes bejegyzés betöltése
+    function loadPosts() {
+        $.getJSON('/api/posts')
+            .done(posts=>{
+                let html = '';
+                if (!posts.length) {
+                    html = '<div class="card">Nincs bejegyzés létrehozva</div>';
+                } else {
+                    posts.forEach(p=> html += renderCard(p));
+                }
+                $('#posts').html(html);
+            })
+            .fail(()=>showError2('Nem sikerült betölteni a bejegyzéseket!'));
+    }
+
+    //egy bejegyzés betöltése(id)
+    function loadPostById(id) {
+        $.getJSON('/api/posts/' + id)
+            .done(p => {
+                let html = renderCard(p);
+                $('#posts').html(html);
+            })
+            .fail(() => showError2('Nincs ilyen ID-jú bejegyzés!'));
+    }
+
+    //bejegyzés létrehozása
+    $('#post-form').on('submit', function(e) {
+        e.preventDefault();
+        const id = $('#edit-id').val();
+        const data = {
+            title: $('#title').val().trim(),
+            author: $('#author').val().trim(),
+            content: $('#content').val().trim()
+        };
+        if (!data.title || !data.author || !data.content) {
+            showError('Minden mezőt tölts ki!');
+            return;
+        }
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? '/api/posts/'+id : '/api/posts';
+        $.ajax({url, method, contentType:'application/json', data:JSON.stringify(data)})
+            .done(()=>{
+                loadPosts();
+                $('#post-form')[0].reset();
+                $('#edit-id').val('');
+                $('#submit-btn').text('Létrehozás');
+                $('#cancel-edit').hide();
+            })
+            .fail(()=>showError('Mentés sikertelen!'));
+    });
+
+    //mégse
+    $('#cancel-edit').on('click', function() {
+        $('#post-form')[0].reset();
+        $('#edit-id').val('');
+        $('#submit-btn').text('Létrehozás');
+        $('#cancel-edit').hide();
+    });
+
+    //törlés
+    $('#posts').on('click','.delete', function() {
+        if (!confirm('Biztosan törlöd?')) return;
+        const id = $(this).closest('.card').data('id');
+        $.ajax({url:'/api/posts/'+id, method:'DELETE'})
+            .done(()=>$(this).closest('.card').remove())
+            .fail(()=>showError2('Törlés nem sikerült.'));
+    });
+
+    //szerkesztés
+    $('#posts').on('click','.edit', function() {
+        const $c = $(this).closest('.card');
+        $('#edit-id').val($c.data('id'));
+        $('#title').val($c.find('h3').text());
+        $('#author').val($c.find('.meta').text().split('•')[0].replace('Szerző:','').trim());
+        $('#content').val($c.find('.content').text());
+        $('#submit-btn').text('Mentés');
+        $('#cancel-edit').show();
+    });
+
+    //összes listázása (betöltéskor)
+    $(loadPosts);
+</script>
+</div>
+</body>
+</html>
